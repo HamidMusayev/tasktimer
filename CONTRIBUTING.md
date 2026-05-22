@@ -89,20 +89,24 @@ go test -v ./...
 ├── internal/
 │   ├── cmd/                 # CLI commands (Cobra)
 │   │   ├── root.go          # Root command and wiring
-│   │   ├── report.go        # tt report
+│   │   ├── report.go        # tt report  (--since / --until flags)
+│   │   ├── start.go         # tt start <title>
+│   │   ├── stop.go          # tt stop
+│   │   ├── pause.go         # tt pause
+│   │   ├── resume.go        # tt resume
 │   │   ├── edit.go          # tt edit
-│   │   ├── list.go          # tt list
+│   │   ├── list.go          # tt list  (-v flag)
 │   │   ├── paths.go         # tt paths
 │   │   ├── tojson.go        # tt to-json
 │   │   └── fromjson.go      # tt from-json
 │   ├── ui/                  # Bubble Tea TUI models
 │   │   ├── main.go          # Root model (task list + input)
-│   │   ├── project_timer.go # Running total timer
+│   │   ├── project_timer.go # Running total timer + taskDuration helper
 │   │   ├── common.go        # Shared styles
 │   │   ├── markdown.go      # Markdown report renderer
 │   │   └── json.go          # JSON serialization helpers
 │   ├── model/
-│   │   └── model.go         # Task data model
+│   │   └── model.go         # Task data model (Task, ExportedTask)
 │   └── store/
 │       └── store.go         # Badger DB persistence layer
 └── .github/

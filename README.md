@@ -17,6 +17,7 @@
 - [Usage](#usage)
   - [Projects](#projects)
   - [Keyboard shortcuts](#keyboard-shortcuts)
+  - [Start, pause, and stop from the CLI](#start-pause-and-stop-from-the-cli)
   - [Report](#report)
   - [Edit](#edit)
   - [List projects](#list-projects)
@@ -86,8 +87,6 @@ Each task has its own timer. The total time across all tasks is shown in the hea
 
 <img width="1312" alt="image" src="https://user-images.githubusercontent.com/245435/132955639-dea42092-c48a-478c-bbe1-e29fbf343c3c.png">
 
-> **Note:** There is no concept of resuming a task. You can, however, create multiple tasks with the same description — they will each appear as separate entries.
-
 ### Projects
 
 By default, all tasks are saved under a project named `default`. Use the `-p` flag to work with a named project:
@@ -104,11 +103,33 @@ This flag is supported by all subcommands.
 |---|---|
 | <kbd>Enter</kbd> | Start a new task / stop the current timer |
 | <kbd>r</kbd> | Restart the selected task (copies its name into the input) |
+| <kbd>p</kbd> | Pause or resume the current task |
+| <kbd>d</kbd> | Delete the selected task |
 | <kbd>ESC</kbd> | Stop the current task and blur the input field |
 | <kbd>↑</kbd> / <kbd>↓</kbd> | Navigate the task list (when input is not focused) |
 | <kbd>Page Up</kbd> / <kbd>Page Down</kbd> | Scroll the task list |
 | <kbd>/</kbd> | Filter the task list |
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | Stop the current timer and exit |
+
+### Start, pause, and stop from the CLI
+
+Control timers without launching the TUI — useful in scripts, shell aliases, or CI hooks:
+
+```sh
+tt start writing tests     # stop any running task, start a new one
+tt pause                   # freeze the current timer (time stops accumulating)
+tt resume                  # continue the paused task from where it left off
+tt stop                    # stop all running or paused tasks
+```
+
+These commands respect the `-p` flag for named projects:
+
+```sh
+tt -p myproject start "fixing the build"
+tt -p myproject pause
+```
+
+A paused task shows `[paused]` in the TUI task list and its elapsed time is frozen until resumed. Press <kbd>p</kbd> in the TUI to toggle pause/resume on the active task.
 
 ### Report
 
@@ -126,6 +147,15 @@ Output goes to `STDOUT`, so you can save or pipe it:
 tt report > report.md
 tt -p myproject report | pbcopy
 ```
+
+Filter by date range with `--since` and `--until` (format: `YYYY-MM-DD`):
+
+```sh
+tt report --since 2026-05-19 --until 2026-05-23   # this week only
+tt report --since 2026-05-22                       # today onwards
+```
+
+The total time shown in the report header reflects only the filtered tasks.
 
 <img width="1312" alt="image" src="https://user-images.githubusercontent.com/245435/132955650-a2b0cfd1-eb38-4ecb-9116-20ca815fe01a.png">
 
@@ -151,6 +181,14 @@ List all projects that have recorded data:
 
 ```sh
 tt list
+```
+
+Add `-v` to see task counts and total time per project:
+
+```sh
+tt list -v
+# default (42 tasks, 3h 15m)
+# work    (18 tasks, 9h 40m)
 ```
 
 ### Backup and restore

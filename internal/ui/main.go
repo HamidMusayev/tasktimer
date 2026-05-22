@@ -19,7 +19,9 @@ type keymap struct {
 	Esc   key.Binding
 	Enter key.Binding
 	CtrlC key.Binding
-	R key.Binding
+	R     key.Binding
+	P     key.Binding
+	D     key.Binding
 }
 
 func Init(db *badger.DB, project string) tea.Model {
@@ -47,6 +49,14 @@ func Init(db *badger.DB, project string) tea.Model {
 			key.WithKeys("r"),
 			key.WithHelp("r", "restart"),
 		),
+		P: key.NewBinding(
+			key.WithKeys("p"),
+			key.WithHelp("p", "pause/resume"),
+		),
+		D: key.NewBinding(
+			key.WithKeys("d"),
+			key.WithHelp("d", "delete"),
+		),
 	}
 
 	l := list.NewModel([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
@@ -59,6 +69,8 @@ func Init(db *badger.DB, project string) tea.Model {
 			keymap.Enter,
 			keymap.CtrlC,
 			keymap.R,
+			keymap.P,
+			keymap.D,
 		}
 	}
 
@@ -113,9 +125,12 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		items := make([]list.Item, 0, len(msg.tasks))
 		for _, t := range msg.tasks {
 			items = append(items, item{
-				title: t.Title,
-				start: t.StartAt,
-				end:   t.EndAt,
+				id:        t.ID,
+				title:     t.Title,
+				start:     t.StartAt,
+				end:       t.EndAt,
+				pausedAt:  t.PausedAt,
+				pausedFor: t.PausedFor,
 			})
 		}
 
@@ -167,6 +182,16 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.input.SetValue(m.list.SelectedItem().FilterValue())
 					m.input.Focus()
 					cmds = append(cmds, textinput.Blink)
+				}
+				newMsg = doNotPropagateMsg{}
+			}
+			if key.Matches(msg, m.keymap.P) {
+				cmds = append(cmds, togglePauseCmd(m.db))
+				newMsg = doNotPropagateMsg{}
+			}
+			if key.Matches(msg, m.keymap.D) {
+				if selected := m.list.SelectedItem(); selected != nil {
+					cmds = append(cmds, deleteTaskCmd(m.db, selected.(item).id))
 				}
 				newMsg = doNotPropagateMsg{}
 			}
@@ -236,6 +261,39 @@ func createTaskCmd(db *badger.DB, t string) tea.Cmd {
 	}
 }
 
+func togglePauseCmd(db *badger.DB) tea.Cmd {
+	return func() tea.Msg {
+		tasks, err := store.GetTaskList(db)
+		if err != nil {
+			return errMsg{err}
+		}
+		for _, t := range tasks {
+			if t.EndAt.IsZero() && t.PausedAt.IsZero() {
+				if err := store.PauseTask(db); err != nil {
+					return errMsg{err}
+				}
+				return updateTaskListMsg{}
+			}
+			if t.EndAt.IsZero() && !t.PausedAt.IsZero() {
+				if err := store.ResumeTask(db); err != nil {
+					return errMsg{err}
+				}
+				return updateTaskListMsg{}
+			}
+		}
+		return nil
+	}
+}
+
+func deleteTaskCmd(db *badger.DB, id uint64) tea.Cmd {
+	return func() tea.Msg {
+		if err := store.DeleteTask(db, id); err != nil {
+			return errMsg{err}
+		}
+		return updateTaskListMsg{}
+	}
+}
+
 func enqueueTaskListUpdate() tea.Msg {
 	return updateTaskListMsg{}
 }
@@ -253,26 +311,36 @@ func updateTaskListCmd(db *badger.DB) tea.Cmd {
 // models
 
 type item struct {
-	title      string
-	start, end time.Time
+	id        uint64
+	title     string
+	start     time.Time
+	end       time.Time
+	pausedAt  time.Time
+	pausedFor time.Duration
 }
 
 func (i item) Title() string {
-	if i.end.IsZero() {
-		return boldStyle.Render(i.title)
+	if !i.end.IsZero() {
+		return i.title
 	}
-	return i.title
+	if !i.pausedAt.IsZero() {
+		return boldStyle.Render(i.title + " [paused]")
+	}
+	return boldStyle.Render(i.title)
 }
 
 func (i item) Description() string {
-	end := time.Now()
-	if !i.end.IsZero() {
-		end = i.end
+	t := model.Task{
+		StartAt:   i.start,
+		EndAt:     i.end,
+		PausedAt:  i.pausedAt,
+		PausedFor: i.pausedFor,
 	}
+	dur := taskDuration(t, time.Now()).Round(time.Second)
 	ago := timeago.Of(i.start, timeago.Options{
 		Precision: timeago.MinutePrecision,
 	})
-	return ago + " - " + end.Sub(i.start).Round(time.Second).String()
+	return ago + " - " + dur.String()
 }
 
 func (i item) FilterValue() string { return i.title }

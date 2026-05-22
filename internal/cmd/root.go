@@ -58,6 +58,10 @@ func newRootCmd(version string, exit func(int)) *rootCmd {
 		newListCmd().cmd,
 		newEditCmd().cmd,
 		newManCmd().cmd,
+		newStartCmd().cmd,
+		newStopCmd().cmd,
+		newPauseCmd().cmd,
+		newResumeCmd().cmd,
 	)
 
 	root.cmd = cmd

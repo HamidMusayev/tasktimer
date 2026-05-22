@@ -54,6 +54,32 @@ func GetTaskList(db *badger.DB) ([]model.Task, error) {
 	return tasks, nil
 }
 
+func GetRunningTask(db *badger.DB) (model.Task, error) {
+	tasks, err := GetTaskList(db)
+	if err != nil {
+		return model.Task{}, err
+	}
+	for _, t := range tasks {
+		if t.EndAt.IsZero() && t.PausedAt.IsZero() {
+			return t, nil
+		}
+	}
+	return model.Task{}, fmt.Errorf("no running task")
+}
+
+func GetPausedTask(db *badger.DB) (model.Task, error) {
+	tasks, err := GetTaskList(db)
+	if err != nil {
+		return model.Task{}, err
+	}
+	for _, t := range tasks {
+		if t.EndAt.IsZero() && !t.PausedAt.IsZero() {
+			return t, nil
+		}
+	}
+	return model.Task{}, fmt.Errorf("no paused task")
+}
+
 func CloseTasks(db *badger.DB) error {
 	return db.Update(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
@@ -69,7 +95,12 @@ func CloseTasks(db *badger.DB) error {
 				if !task.EndAt.IsZero() {
 					return nil
 				}
-				task.EndAt = time.Now().Truncate(time.Second)
+				if !task.PausedAt.IsZero() {
+					task.EndAt = task.PausedAt.Truncate(time.Second)
+					task.PausedAt = time.Time{}
+				} else {
+					task.EndAt = time.Now().Truncate(time.Second)
+				}
 				log.Println("closing", task.Title)
 				return setTask(txn, k, task)
 			})
@@ -78,6 +109,76 @@ func CloseTasks(db *badger.DB) error {
 			}
 		}
 		return nil
+	})
+}
+
+func PauseTask(db *badger.DB) error {
+	return db.Update(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+			k := item.Key()
+			var found bool
+			err := item.Value(func(v []byte) error {
+				var task model.Task
+				if err := json.Unmarshal(v, &task); err != nil {
+					return err
+				}
+				if task.EndAt.IsZero() && task.PausedAt.IsZero() {
+					task.PausedAt = time.Now().Truncate(time.Second)
+					found = true
+					return setTask(txn, k, task)
+				}
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+			if found {
+				return nil
+			}
+		}
+		return fmt.Errorf("no running task to pause")
+	})
+}
+
+func ResumeTask(db *badger.DB) error {
+	return db.Update(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+			k := item.Key()
+			var found bool
+			err := item.Value(func(v []byte) error {
+				var task model.Task
+				if err := json.Unmarshal(v, &task); err != nil {
+					return err
+				}
+				if task.EndAt.IsZero() && !task.PausedAt.IsZero() {
+					task.PausedFor += time.Now().Truncate(time.Second).Sub(task.PausedAt)
+					task.PausedAt = time.Time{}
+					found = true
+					return setTask(txn, k, task)
+				}
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+			if found {
+				return nil
+			}
+		}
+		return fmt.Errorf("no paused task to resume")
+	})
+}
+
+func DeleteTask(db *badger.DB, id uint64) error {
+	key := []byte(string(prefix) + strconv.FormatUint(id, 10))
+	return db.Update(func(txn *badger.Txn) error {
+		return txn.Delete(key)
 	})
 }
 
