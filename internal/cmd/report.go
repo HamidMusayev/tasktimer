@@ -15,7 +15,7 @@ type reportCmd struct {
 	cmd *cobra.Command
 }
 
-func newRerportCmd() *reportCmd {
+func newReportCmd() *reportCmd {
 	cmd := &cobra.Command{
 		Use:     "report",
 		Aliases: []string{"r"},

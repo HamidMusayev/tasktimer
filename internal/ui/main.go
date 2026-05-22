@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"log"
 	"strings"
 	"time"
 
@@ -104,17 +103,13 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case errMsg:
-		log.Println("errMsg")
 		m.err = msg.error
 	case tea.WindowSizeMsg:
-		log.Println("tea.WindowSizeMsg")
 		top, right, bottom, left := listStyle.GetMargin()
 		m.list.SetSize(msg.Width-left-right, msg.Height-top-bottom)
 	case updateTaskListMsg:
-		log.Println("updateTaskListMsg")
 		cmds = append(cmds, m.list.StartSpinner(), updateTaskListCmd(m.db))
 	case taskListUpdatedMsg:
-		log.Println("taskListUpdatedMsg")
 		items := make([]list.Item, 0, len(msg.tasks))
 		for _, t := range msg.tasks {
 			items = append(items, item{
@@ -130,18 +125,15 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, m.list.SetItems(items), updateProjectTimerCmd(msg.tasks))
 	case tea.KeyMsg:
 		if key.Matches(msg, m.keymap.CtrlC) {
-			log.Println("tea.KeyMsg -> ctrl+c")
 			return m, tea.Sequentially(closeTasksCmd(m.db), tea.Quit)
 		}
 
 		if m.list.SettingFilter() {
-			log.Println("tea.KeyMsg -> settingFilter")
 			break
 		}
 
 		if m.input.Focused() {
 			if key.Matches(msg, m.keymap.Esc) {
-				log.Println("tea.KeyMsg -> input.Focused -> esc")
 				m.input.Blur()
 				cmds = append(cmds, tea.Sequentially(
 					closeTasksCmd(m.db),
@@ -149,41 +141,39 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				)
 			}
 			if key.Matches(msg, m.keymap.Enter) {
-				log.Println("tea.KeyMsg -> input.Focused -> enter")
-				cmds = append(cmds, tea.Sequentially(
-					closeTasksCmd(m.db),
-					createTaskCmd(m.db, strings.TrimSpace(m.input.Value())),
-				))
+				input := strings.TrimSpace(m.input.Value())
+				if input != "" {
+					cmds = append(cmds, tea.Sequentially(
+						closeTasksCmd(m.db),
+						createTaskCmd(m.db, input),
+					))
+				}
 				m.input.SetValue("")
 			}
 
-			// delegate keypresses to input
-			log.Println("tea.KeyMsg -> input.Focused")
 			m.input, cmd = m.input.Update(msg)
 			cmds = append(cmds, cmd)
 			newMsg = doNotPropagateMsg{}
 		} else {
 			if key.Matches(msg, m.keymap.Esc) {
-				log.Println("tea.KeyMsg -> !input.Focused -> esc")
 				newMsg = doNotPropagateMsg{}
 			}
 			if key.Matches(msg, m.keymap.Enter) {
-				log.Println("tea.KeyMsg -> !input.Focused -> enter")
 				m.input.Focus()
 				cmds = append(cmds, textinput.Blink)
 			}
 			if key.Matches(msg, m.keymap.R) {
-				log.Println("tea.KeyMsg -> !input.Focused -> R")
-				m.input.SetValue(m.list.SelectedItem().FilterValue())
-				m.input.Focus()
-				cmds = append(cmds, textinput.Blink)
-				newMsg = doNotPropagateMsg{};
+				if m.list.SelectedItem() != nil {
+					m.input.SetValue(m.list.SelectedItem().FilterValue())
+					m.input.Focus()
+					cmds = append(cmds, textinput.Blink)
+				}
+				newMsg = doNotPropagateMsg{}
 			}
 		}
 	}
 
 	if newMsg != nil {
-		log.Println("tea.KeyMsg -> override original msg")
 		msg = newMsg
 	}
 
@@ -230,7 +220,6 @@ func (e errMsg) Error() string { return e.error.Error() }
 
 func closeTasksCmd(db *badger.DB) tea.Cmd {
 	return func() tea.Msg {
-		log.Println("closeTasksCmd")
 		if err := store.CloseTasks(db); err != nil {
 			return errMsg{err}
 		}
@@ -240,7 +229,6 @@ func closeTasksCmd(db *badger.DB) tea.Cmd {
 
 func createTaskCmd(db *badger.DB, t string) tea.Cmd {
 	return func() tea.Msg {
-		log.Println("createTaskCmd")
 		if err := store.CreateTask(db, t); err != nil {
 			return errMsg{err}
 		}
@@ -254,7 +242,6 @@ func enqueueTaskListUpdate() tea.Msg {
 
 func updateTaskListCmd(db *badger.DB) tea.Cmd {
 	return func() tea.Msg {
-		log.Println("updateTaskListCmd")
 		tasks, err := store.GetTaskList(db)
 		if err != nil {
 			return errMsg{err}

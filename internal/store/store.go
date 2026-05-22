@@ -17,6 +17,14 @@ var (
 	sequenceID = []byte("tasks_seq")
 )
 
+func setTask(txn *badger.Txn, key []byte, task model.Task) error {
+	bts, err := task.Bytes()
+	if err != nil {
+		return err
+	}
+	return txn.Set(key, bts)
+}
+
 func GetTaskList(db *badger.DB) ([]model.Task, error) {
 	var tasks []model.Task
 	if err := db.View(func(txn *badger.Txn) error {
@@ -63,7 +71,7 @@ func CloseTasks(db *badger.DB) error {
 				}
 				task.EndAt = time.Now().Truncate(time.Second)
 				log.Println("closing", task.Title)
-				return txn.Set(k, task.Bytes())
+				return setTask(txn, k, task)
 			})
 			if err != nil {
 				return err
@@ -91,11 +99,11 @@ func CreateTask(db *badger.DB, t string) error {
 
 		id := string(prefix) + strconv.FormatUint(s, 10)
 		log.Println("creating task:", id, "->", t)
-		return txn.Set([]byte(id), model.Task{
+		return setTask(txn, []byte(id), model.Task{
 			ID:      s,
 			Title:   t,
 			StartAt: time.Now().Truncate(time.Second),
-		}.Bytes())
+		})
 	})
 }
 
@@ -117,12 +125,12 @@ func LoadTasks(db *badger.DB, tasks []model.ExportedTask) error {
 			}
 			id := string(prefix) + strconv.FormatUint(s, 10)
 			log.Println("creating task:", id, "->", t)
-			if err := txn.Set([]byte(id), model.Task{
+			if err := setTask(txn, []byte(id), model.Task{
 				ID:      s,
 				Title:   t.Title,
 				StartAt: t.StartAt,
 				EndAt:   t.EndAt,
-			}.Bytes()); err != nil {
+			}); err != nil {
 				return fmt.Errorf("failed to create task: %w", err)
 			}
 		}

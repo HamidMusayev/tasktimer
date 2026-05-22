@@ -43,18 +43,21 @@ func updateProjectTimerCmd(tasks []model.Task) tea.Cmd {
 	}
 }
 
+func effectiveEndAt(endAt time.Time, now time.Time) time.Time {
+	if endAt.IsZero() {
+		return now
+	}
+	return endAt
+}
+
 func sumTasksTimes(tasks []model.Task, since time.Time) time.Duration {
 	d := time.Duration(0)
+	now := time.Now()
 	for _, t := range tasks {
 		if t.StartAt.Before(since) {
 			continue
 		}
-
-		z := t.EndAt
-		if z.IsZero() {
-			z = time.Now()
-		}
-		d += z.Sub(t.StartAt)
+		d += effectiveEndAt(t.EndAt, now).Sub(t.StartAt)
 	}
 	return d
 }

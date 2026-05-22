@@ -2,7 +2,6 @@ package model
 
 import (
 	"encoding/json"
-	"log"
 	"time"
 )
 
@@ -13,12 +12,8 @@ type Task struct {
 	EndAt   time.Time `json:"end"`
 }
 
-func (t Task) Bytes() []byte {
-	bts, err := json.Marshal(&t)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	return bts
+func (t Task) Bytes() ([]byte, error) {
+	return json.Marshal(&t)
 }
 
 type ExportedTask struct {
@@ -27,10 +22,6 @@ type ExportedTask struct {
 	EndAt   time.Time `json:"end"`
 }
 
-func (t ExportedTask) Bytes() []byte {
-	bts, err := json.Marshal(&t)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	return bts
+func (t ExportedTask) Bytes() ([]byte, error) {
+	return json.Marshal(&t)
 }
