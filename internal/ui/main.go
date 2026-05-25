@@ -147,6 +147,11 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 
+		if key.Matches(msg, m.keymap.P) {
+			cmds = append(cmds, togglePauseCmd(m.db))
+			newMsg = doNotPropagateMsg{}
+		}
+
 		if m.input.Focused() {
 			if key.Matches(msg, m.keymap.Esc) {
 				m.input.Blur()
@@ -166,8 +171,10 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.SetValue("")
 			}
 
-			m.input, cmd = m.input.Update(msg)
-			cmds = append(cmds, cmd)
+			if newMsg == nil {
+				m.input, cmd = m.input.Update(msg)
+				cmds = append(cmds, cmd)
+			}
 			newMsg = doNotPropagateMsg{}
 		} else {
 			if key.Matches(msg, m.keymap.Esc) {
@@ -183,10 +190,6 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.input.Focus()
 					cmds = append(cmds, textinput.Blink)
 				}
-				newMsg = doNotPropagateMsg{}
-			}
-			if key.Matches(msg, m.keymap.P) {
-				cmds = append(cmds, togglePauseCmd(m.db))
 				newMsg = doNotPropagateMsg{}
 			}
 			if key.Matches(msg, m.keymap.D) {
